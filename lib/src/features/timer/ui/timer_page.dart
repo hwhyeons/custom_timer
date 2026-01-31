@@ -142,7 +142,7 @@ class TimerPage extends ConsumerWidget {
               const SizedBox(width: 8),
               _QuickAddButton(label: '+10분', seconds: 600, onTap: notifier.adjustTime),
               const SizedBox(width: 8),
-              _QuickAddButton(label: '-10초', seconds: -10, onTap: notifier.adjustTime),
+              _QuickAddButton(label: '-1분', seconds: -60, onTap: notifier.adjustTime),
             ],
           ),
         ),
