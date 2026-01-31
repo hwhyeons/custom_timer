@@ -86,9 +86,8 @@ class TimerNotifier extends Notifier<TimerModel> {
   void pauseTimer() {
     _ticker?.cancel();
     // 일시정지는 남은 시간(remainingTime)은 기억해야 하므로 copyWith를 쓰되,
-    // targetTime을 지우기 위해 '새로운 객체 생성' 방식을 응용하거나
-    // Model의 copyWith를 수정해야 합니다.
-    // 여기서는 가장 간단하게 객체를 새로 만드는 방식으로 해결합시다.
+    // targetTime을 지워야함
+    // 왜냐하면 일시정지가 풀리고 나서 재개할 때 새로운 targetTime을 계산해야 하기 때문에 임시로 삭제하고 resumeTimer에서 다시 설정
     state = TimerModel(
       initialDuration: state.initialDuration,
       remainingTime: state.remainingTime, // 현재 남은 시간 유지
@@ -96,8 +95,8 @@ class TimerNotifier extends Notifier<TimerModel> {
       isRunning: false,
       targetTime: null,                   // ★ 확실하게 null로 초기화
     );
-    // ▼▼▼ 백그라운드 서비스 알림 중지 ▼▼▼
-    BackgroundService.stopService();
+    // ▼▼▼ 백그라운드 서비스 알림 "일시정지"로 변경 ▼▼▼
+    BackgroundService.pauseService();
   }
 
   // 재개 (로직이 startTimer와 같음)
@@ -156,5 +155,24 @@ class TimerNotifier extends Notifier<TimerModel> {
       isFinished: false,
     );
     BackgroundService.stopService();
+  }
+
+  // ▼▼▼ 앱 재시작 시 백그라운드 서비스와 상태 동기화 (상태복구)▼▼▼
+  void syncWithBackground(DateTime targetTime) {
+    // 1. 현재 시간과 목표 시간을 비교하여 남은 시간 계산
+    final remaining = targetTime.difference(DateTime.now()).inSeconds;
+
+    // 2. 남은 시간이 0보다 크면, 타이머를 실행 중 상태로 복원
+    if (remaining > 0) {
+      state = state.copyWith(
+        isRunning: true,
+        isSetup: false,
+        isFinished: false,
+        targetTime: targetTime,
+        remainingTime: remaining,
+      );
+      // 3. 화면 갱신용 Ticker 다시 시작
+      _startTicker();
+    }
   }
 }

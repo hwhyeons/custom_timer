@@ -23,6 +23,8 @@ class TimerModel {
   });
 
   // 상태 복사를 위한 메서드 (불변성 유지)
+  // 필요한 필드만 변경하고 나머지는 기존 값 유지
+  // 예) state = state.copyWith(remainingTime: 30, isRunning: true);
   TimerModel copyWith({
     int? initialDuration,
     int? remainingTime,

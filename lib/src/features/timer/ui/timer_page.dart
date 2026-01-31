@@ -21,10 +21,16 @@ class TimerPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+
+    // ref.watch의 역할 : 타이머 상태를 구독하여 변경 시 UI가 자동으로 갱신되도록 함
+    // 즉 이 build()에서 ref.watch(timerProvider)를 호출하면, 타이머 상태가 변경될 때마다 이 build() 메서드가 다시 호출되어 UI가 업데이트됨
     final timerState = ref.watch(timerProvider);
+
     final timerNotifier = ref.read(timerProvider.notifier);
 
-    // ▼▼▼ 추가: 종료 상태 감지 리스너 ▼▼▼
+    // 추가: 종료 상태 감지 리스너
+    // UI 상태 변화가 일어날 때마다 riverpod이 build()를 호출함
+    // 그래도 ref.listen()을 build()안에다 넣어도 되는 이유 : 리스너를 중복등록되지 않게 관리함
     ref.listen(timerProvider, (previous, next) {
       // "방금 전까진 안 끝났는데(false), 지금 끝났다(true)"면 팝업 띄우기
       if ((previous?.isFinished == false) && next.isFinished) {
@@ -34,6 +40,8 @@ class TimerPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('타이머')),
+
+      // !!riverpod state의 isSetup 값에 따라 어느 화면을 보여줄지를 결정하는 로직!!
       body: Center(
         child: timerState.isSetup
             ? _buildSetupView(context, timerState, timerNotifier)
@@ -111,6 +119,7 @@ class TimerPage extends ConsumerWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         // 남은 시간 표시
+        // !!여기서 state.remainingTime을 사용하기 때문에 타이머가 조정됨에 따라 실시간으로 업데이트됨!!
         Text(
           _formatTime(state.remainingTime),
           style: const TextStyle(
