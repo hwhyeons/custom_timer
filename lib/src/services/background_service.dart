@@ -107,6 +107,16 @@ void onStart(ServiceInstance service) async {
     // 서비스 자체를 종료시켜서 알림을 상단바에서 제거
     service.stopSelf();
   });
+
+  // 4. UI로부터 현재 상태를 요청받았을 때
+  service.on('requestCurrentState').listen((event) {
+    // 현재 타이머가 실행 중일 때만 상태를 전송
+    if (targetTime != null) {
+      service.invoke('currentState', {
+        'targetTime': targetTime!.toIso8601String(),
+      });
+    }
+  });
 }
 
 class BackgroundService {
