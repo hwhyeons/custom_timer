@@ -1,8 +1,11 @@
+
+/*
+!! 상단바에 항상 떠있는 알림은 RiverPod을 사용하는게 아님!!
+ */
+
+
 import 'dart:async';
-import 'dart:ui';
-import 'package:flutter_background_service/flutter_background_service.dart';
-// ▼▼▼ 이 패키지가 꼭 있어야 AndroidServiceInstance 기능을 쓸 수 있습니다 ▼▼▼
-import 'package:flutter_background_service_android/flutter_background_service_android.dart';
+import 'package:flutter_background_service/flutter_background_service.dart'; // 이 패키지가 꼭 있어야 AndroidServiceInstance 기능을 쓸 수 있습니다
 import 'notification_service.dart';
 
 // 서비스 진입점 (최상위 레벨 함수여야 함)
@@ -23,8 +26,8 @@ void onStart(ServiceInstance service) async {
     });
   }
 
-  Timer? _bgTimer;
-  DateTime? _targetTime;
+  Timer? bgTimer;
+  DateTime? targetTime;
 
   // 1. UI로부터 'startTimer' 신호를 받았을 때
   service.on('startTimer').listen((event) async {
@@ -32,7 +35,7 @@ void onStart(ServiceInstance service) async {
 
     // 목표 시간(String)을 받아서 DateTime으로 변환
     final targetIso = event['targetTime'] as String;
-    _targetTime = DateTime.parse(targetIso);
+    targetTime = DateTime.parse(targetIso);
 
     // 타이머가 돌기 시작하면, 먼저 서비스를 포그라운드로 확실히 전환
     // Q. 왜 여기서 포그라운드로 확실히 전환하나요?
@@ -45,15 +48,15 @@ void onStart(ServiceInstance service) async {
     }
 
     // 1초마다 알림 갱신 시작
-    _bgTimer?.cancel();
-    _bgTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
-      if (_targetTime == null) {
+    bgTimer?.cancel();
+    bgTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
+      if (targetTime == null) {
         timer.cancel();
         return;
       }
 
       final now = DateTime.now();
-      final diff = _targetTime!.difference(now).inSeconds;
+      final diff = targetTime!.difference(now).inSeconds;
       if (service is AndroidServiceInstance) {
         if (diff > 0) {
           // 남은 시간을 00:00 형식으로 변환
@@ -69,7 +72,7 @@ void onStart(ServiceInstance service) async {
         } else {
           // 시간이 다 됨
           timer.cancel();
-          _targetTime = null;
+          targetTime = null;
 
           // 1. 카운트다운 알림(서비스)은 이제 필요 없으므로 종료
           service.stopSelf();
@@ -86,13 +89,22 @@ void onStart(ServiceInstance service) async {
     });
   });
 
-  // 2. UI로부터 'stopTimer' 신호를 받았을 때
-  service.on('stopTimer').listen((event) {
-    _bgTimer?.cancel();
-    _targetTime = null;
-    NotificationService.cancelNotification(); // 알림 제거
+  // 2. UI로부터 'pauseTimer' 신호를 받았을 때
+  service.on('pauseTimer').listen((event) {
+    bgTimer?.cancel();
+    if (service is AndroidServiceInstance) {
+      service.setForegroundNotificationInfo(
+        title: '타이머 일시정지',
+        content: '타이머가 일시정지되었습니다.',
+      );
+    }
+  });
 
-    // 서비스 자체를 종료시켜서 알림을 상단바에서 제거 ▼▼▼
+  // 3. UI로부터 'stopTimer' 신호를 받았을 때
+  service.on('stopTimer').listen((event) {
+    bgTimer?.cancel();
+    targetTime = null;
+    // 서비스 자체를 종료시켜서 알림을 상단바에서 제거
     service.stopSelf();
   });
 }
@@ -150,10 +162,20 @@ class BackgroundService {
     );
   }
 
+  // 서비스 일시정지 (타이머 일시정지 시 호출)
+  static Future<void> pauseService() async {
+    final service = FlutterBackgroundService();
+    if (await service.isRunning()) {
+      service.invoke('pauseTimer');
+    }
+  }
+
   // 서비스 정지 (타이머 정지/취소 시 호출)
   static Future<void> stopService() async {
     final service = FlutterBackgroundService();
-    service.invoke('stopTimer');
+    if (await service.isRunning()) {
+      service.invoke('stopTimer');
+    }
     // 완전히 끄고 싶으면 service.invoke('stopService') 호출 가능하나,
     // 보통은 상태만 리셋하고 서비스는 살려두기도 함. 여기선 알림만 끔.
   }
